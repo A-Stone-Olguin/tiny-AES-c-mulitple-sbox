@@ -13,6 +13,9 @@ endif
 ifdef AES256
 CFLAGS += -DAES256=1
 endif
+ifdef SBOX2
+CFLAGS += -DSBOX2=1
+endif
 
 OBJCOPYFLAGS = -j .text -O ihex
 OBJCOPY      = objcopy
@@ -56,6 +59,11 @@ test:
 	make clean && make && ./test.elf
 	make clean && make AES192=1 && ./test.elf
 	make clean && make AES256=1 && ./test.elf
+
+test2:
+	make clean && make SBOX2=1 && ./test.elf
+	make clean && make AES192=1 SBOX2=1 && ./test.elf
+	make clean && make AES256=1 SBOX2=1 && ./test.elf
 
 lint:
 	$(call SPLINT)

@@ -23,6 +23,9 @@
   #define CTR 1
 #endif
 
+#ifndef SBOX2 
+  #define SBOX2 0 
+#endif
 
 #define AES128 1
 //#define AES192 1
