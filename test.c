@@ -45,13 +45,13 @@ int main(void)
 	test_encrypt_ctr() + test_decrypt_ctr() +
 	test_decrypt_ecb() + test_encrypt_ecb();
     test_encrypt_ecb_verbose();
-    encrypt_file("dummy.txt");
+    encrypt_file("CLogo2.png");
     #else
     exit = test_encrypt_cbc() + test_decrypt_cbc() +
 	test_encrypt_ctr() + test_decrypt_ctr() +
 	test_decrypt_ecb() + test_encrypt_ecb();
     test_encrypt_ecb_verbose();
-    encrypt_file("dummy.txt");
+    encrypt_file("CLogo2.png");
     #endif
 
     return exit;
@@ -378,9 +378,9 @@ static void encrypt_file(char* filename) {
         bufsize = ftell(fp);
         if (bufsize == -1) { perror("Error getting file size!"); fclose(fp); return;}
 
-        if (bufsize % 16 != 0) {printf("Fix the buffer to be a multiple of 16! It is: %ld", bufsize %16);
-                                fclose(fp);
-                                return;}
+        // if (bufsize % 16 != 0) {printf("Fix the buffer to be a multiple of 16! It is: %ld", bufsize %16);
+        //                         fclose(fp);
+        //                         return;}
         num_rows = bufsize / 16;
 
         /* Allocate our buffer to that size. */
@@ -403,6 +403,23 @@ static void encrypt_file(char* filename) {
             plain_text[newLen++] = '\0'; /* Just to be safe. */
         }
         fclose(fp);
+
+
+        // Adding padding
+        size_t padding = 16 - (newLen % 16);
+        if (padding != 0) {
+            plain_text = realloc(plain_text, newLen + padding);
+            if (plain_text == NULL) {
+                perror("Error reallocating memory for padding");
+                free(plain_text);
+                return;
+            }
+        }
+        for (size_t i = newLen; i < newLen + padding; ++i) {
+            plain_text[i] = (char)padding;
+        }
+        newLen += padding;
+        plain_text[newLen] = '\0';
     }
 
     uint8_t key[16] = { (uint8_t) 0x2b, (uint8_t) 0x7e, (uint8_t) 0x15, (uint8_t) 0x16, (uint8_t) 0x28, (uint8_t) 0xae, (uint8_t) 0xd2, (uint8_t) 0xa6, (uint8_t) 0xab, (uint8_t) 0xf7, (uint8_t) 0x15, (uint8_t) 0x88, (uint8_t) 0x09, (uint8_t) 0xcf, (uint8_t) 0x4f, (uint8_t) 0x3c };
@@ -412,7 +429,6 @@ static void encrypt_file(char* filename) {
     for (size_t i = 0; i < num_rows; ++i)
     {
         AES_ECB_encrypt(&ctx, plain_text + (i * 16));
-        // phex(plain_text + (i * 16));
     }
     printf("\n");
 
