@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 // Enable ECB, CTR and CBC mode. Note this can be done before including aes.h or at compile-time.
 // E.g. with GCC by using the -D flag: gcc -c aes.c -DCBC=0 -DCTR=1 -DECB=1
@@ -20,6 +21,8 @@ static int test_encrypt_ecb(void);
 static int test_decrypt_ecb(void);
 static void test_encrypt_ecb_verbose(void);
 // static void test_decrypt_ecb_verbose(void);
+
+static void encrypt_file(char* filename);
 
 int main(void)
 {
@@ -42,12 +45,13 @@ int main(void)
 	test_encrypt_ctr() + test_decrypt_ctr() +
 	test_decrypt_ecb() + test_encrypt_ecb();
     test_encrypt_ecb_verbose();
+    encrypt_file("dummy.txt");
     #else
     exit = test_encrypt_cbc() + test_decrypt_cbc() +
 	test_encrypt_ctr() + test_decrypt_ctr() +
 	test_decrypt_ecb() + test_encrypt_ecb();
     test_encrypt_ecb_verbose();
-    return exit;
+    encrypt_file("dummy.txt");
     #endif
 
     return exit;
@@ -357,3 +361,63 @@ static int test_decrypt_ecb(void)
 }
 
 
+static void encrypt_file(char* filename) {
+    uint8_t *plain_text = NULL;
+    long num_rows = 0;
+    long bufsize;
+
+    FILE *fp = fopen(filename, "r");
+    if (fp == NULL) {
+        perror("Error opening file");
+        return;
+    }
+
+    /* Go to the end of the file. */
+    if (fseek(fp, 0L, SEEK_END) == 0) {
+        /* Get the size of the file. */
+        bufsize = ftell(fp);
+        if (bufsize == -1) { perror("Error getting file size!"); fclose(fp); return;}
+
+        if (bufsize % 16 != 0) {printf("Fix the buffer to be a multiple of 16! It is: %ld", bufsize %16);
+                                fclose(fp);
+                                return;}
+        num_rows = bufsize / 16;
+
+        /* Allocate our buffer to that size. */
+        plain_text = malloc(sizeof(char) * (bufsize + 1));
+
+        if (plain_text == NULL) {
+            perror("Error allocating memory");
+            fclose(fp);
+            return;
+        }
+
+        /* Go back to the start of the file. */
+        if (fseek(fp, 0L, SEEK_SET) != 0) { perror("Error going back to the start of the file"); free(plain_text); fclose(fp); return; }
+
+        /* Read the entire file into memory. */
+        size_t newLen = fread(plain_text, sizeof(char), bufsize, fp);
+        if ( ferror( fp ) != 0 ) {
+            fputs("Error reading file", stderr);
+        } else {
+            plain_text[newLen++] = '\0'; /* Just to be safe. */
+        }
+        fclose(fp);
+    }
+
+    uint8_t key[16] = { (uint8_t) 0x2b, (uint8_t) 0x7e, (uint8_t) 0x15, (uint8_t) 0x16, (uint8_t) 0x28, (uint8_t) 0xae, (uint8_t) 0xd2, (uint8_t) 0xa6, (uint8_t) 0xab, (uint8_t) 0xf7, (uint8_t) 0x15, (uint8_t) 0x88, (uint8_t) 0x09, (uint8_t) 0xcf, (uint8_t) 0x4f, (uint8_t) 0x3c };
+    struct AES_ctx ctx;
+    AES_init_ctx(&ctx, key);
+
+    for (size_t i = 0; i < num_rows; ++i)
+    {
+        AES_ECB_encrypt(&ctx, plain_text + (i * 16));
+        // phex(plain_text + (i * 16));
+    }
+    printf("\n");
+
+    printf("Number rows: %ld\n", num_rows);
+
+    free(plain_text); /* Don't forget to call free() later! */
+
+}
