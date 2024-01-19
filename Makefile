@@ -16,6 +16,9 @@ endif
 ifdef SBOX2
 CFLAGS += -DSBOX2=1
 endif
+ifdef TIME 
+CFLAGS += -DTIME=1
+endif
 
 OBJCOPYFLAGS = -j .text -O ihex
 OBJCOPY      = objcopy
@@ -64,6 +67,10 @@ test2:
 	make clean && make SBOX2=1 && ./test.elf
 	make clean && make AES192=1 SBOX2=1 && ./test.elf
 	make clean && make AES256=1 SBOX2=1 && ./test.elf
+
+time:
+	make clean && make TIME=1 && ./test.elf 
+	make clean && make TIME=1 SBOX2=1 && ./test.elf
 
 lint:
 	$(call SPLINT)

@@ -2,6 +2,9 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <dirent.h>
+#include <time.h>
+#include <sys/stat.h>
 
 // Enable ECB, CTR and CBC mode. Note this can be done before including aes.h or at compile-time.
 // E.g. with GCC by using the -D flag: gcc -c aes.c -DCBC=0 -DCTR=1 -DECB=1
@@ -20,9 +23,10 @@ static int test_decrypt_ctr(void);
 static int test_encrypt_ecb(void);
 static int test_decrypt_ecb(void);
 static void test_encrypt_ecb_verbose(void);
-// static void test_decrypt_ecb_verbose(void);
 
 static void encrypt_file(char* filename);
+static void decrypt_file(char* filename, size_t buffer_size, int padding);
+static void time_encrypt_decrypt(void);
 
 int main(void)
 {
@@ -45,13 +49,17 @@ int main(void)
 	test_encrypt_ctr() + test_decrypt_ctr() +
 	test_decrypt_ecb() + test_encrypt_ecb();
     test_encrypt_ecb_verbose();
-    encrypt_file("CLogo2.png");
+    encrypt_file("dummy.txt");
     #else
     exit = test_encrypt_cbc() + test_decrypt_cbc() +
 	test_encrypt_ctr() + test_decrypt_ctr() +
 	test_decrypt_ecb() + test_encrypt_ecb();
     test_encrypt_ecb_verbose();
-    encrypt_file("CLogo2.png");
+    encrypt_file("dummy.txt");
+    #endif
+
+    #if defined(TIME)
+    time_encrypt_decrypt();
     #endif
 
     return exit;
@@ -364,7 +372,8 @@ static int test_decrypt_ecb(void)
 static void encrypt_file(char* filename) {
     uint8_t *plain_text = NULL;
     long num_rows = 0;
-    long bufsize;
+    long bufsize = 0;
+    int padding = 0;
 
     FILE *fp = fopen(filename, "r");
     if (fp == NULL) {
@@ -378,16 +387,13 @@ static void encrypt_file(char* filename) {
         bufsize = ftell(fp);
         if (bufsize == -1) { perror("Error getting file size!"); fclose(fp); return;}
 
-        // if (bufsize % 16 != 0) {printf("Fix the buffer to be a multiple of 16! It is: %ld", bufsize %16);
-        //                         fclose(fp);
-        //                         return;}
         num_rows = bufsize / 16;
 
         /* Allocate our buffer to that size. */
         plain_text = malloc(sizeof(char) * (bufsize + 1));
 
         if (plain_text == NULL) {
-            perror("Error allocating memory");
+            printf("Error allocating memory for plaintext on file: %s\n", filename);
             fclose(fp);
             return;
         }
@@ -406,7 +412,7 @@ static void encrypt_file(char* filename) {
 
 
         // Adding padding
-        size_t padding = 16 - (newLen % 16);
+        padding = 16 - (newLen % 16);
         if (padding != 0) {
             plain_text = realloc(plain_text, newLen + padding);
             if (plain_text == NULL) {
@@ -430,10 +436,93 @@ static void encrypt_file(char* filename) {
     {
         AES_ECB_encrypt(&ctx, plain_text + (i * 16));
     }
-    printf("\n");
+    free(plain_text);
 
-    printf("Number rows: %ld\n", num_rows);
+    decrypt_file(filename, bufsize, padding);
+    return;
+}
 
-    free(plain_text); /* Don't forget to call free() later! */
+static void decrypt_file(char* filename, size_t buffer_size, int padding) {
+    uint8_t *cipher_text = NULL;
+    long num_rows = buffer_size/16;
 
+    FILE *fp = fopen(filename, "r");
+    if (fp == NULL) {
+        perror("Error opening file");
+        return;
+    }
+    cipher_text = malloc(sizeof(char) * (buffer_size + 1));
+
+    if (cipher_text == NULL) {
+        printf("Error allocating memory for ciphertext on file: %s\n", filename);
+        fclose(fp);
+        return;
+    }
+    /* Read the entire file into memory. */
+    size_t newLen = fread(cipher_text, sizeof(char), buffer_size, fp);
+    if ( ferror( fp ) != 0 ) {
+        fputs("Error reading file", stderr);
+    } else {
+        cipher_text[newLen++] = '\0'; /* Just to be safe. */
+    }
+    fclose(fp);
+
+    if (padding != 0) {
+        cipher_text = realloc(cipher_text, newLen + padding);
+        if (cipher_text == NULL) {
+            perror("Error reallocating memory for padding");
+            free(cipher_text);
+            return;
+        }
+    }
+    for (size_t i = newLen; i < newLen + padding; ++i) {
+        cipher_text[i] = (char)padding;
+    }
+    newLen += padding;
+    cipher_text[newLen] = '\0';    
+    
+    uint8_t key[16] = { (uint8_t) 0x2b, (uint8_t) 0x7e, (uint8_t) 0x15, (uint8_t) 0x16, (uint8_t) 0x28, (uint8_t) 0xae, (uint8_t) 0xd2, (uint8_t) 0xa6, (uint8_t) 0xab, (uint8_t) 0xf7, (uint8_t) 0x15, (uint8_t) 0x88, (uint8_t) 0x09, (uint8_t) 0xcf, (uint8_t) 0x4f, (uint8_t) 0x3c };
+    struct AES_ctx ctx;
+    AES_init_ctx(&ctx, key);
+
+    for (size_t i = 0; i < num_rows; ++i)
+    {
+        AES_ECB_decrypt(&ctx, cipher_text + (i * 16));
+    }
+
+    free(cipher_text);
+    return;
+}
+
+static void time_encrypt_decrypt() {
+    struct dirent * dp;
+    DIR *dfd;
+    char *dir = "dummy_files/";
+    clock_t start, end;
+    int num_files = 0;
+
+    if ((dfd = opendir(dir)) == NULL) {
+        fprintf(stderr, "Can't open%s\n", dir);
+        return;
+    }
+
+    start = clock();
+    while ((dp = readdir(dfd)) != NULL) {
+        char full_path[30];      // FIle names will have at most 30 length
+        snprintf(full_path, sizeof(full_path), "%s%s", dir, dp->d_name);
+        struct stat st;
+
+        // Ensure we only encrypt regular files (Does a bit of slowdown)
+        if (stat(full_path, &st) == 0 && S_ISREG(st.st_mode)) {
+            encrypt_file(full_path);
+            num_files++;
+        }
+    }
+    end = clock();
+
+    closedir(dfd);
+    double time_elapsed = ((double) (end - start)/ CLOCKS_PER_SEC);
+    double average_time = time_elapsed / (double) num_files;
+    printf("The time elapsed was %f seconds (%f ms) with an average time of %f seconds (%f ms)\n", time_elapsed, time_elapsed * 100, average_time, average_time * 100);
+    return;
 }
