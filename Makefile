@@ -55,6 +55,14 @@ aes.a : aes.o
 
 lib : aes.a
 
+time.o : time.c aes.h aes.o 
+	echo [CC] $@ $(CFLAGS)
+	$(CC) $(CFLAGS) -o  $@ $<
+
+time.elf : aes.o time.o 
+	echo [LD] $@
+	$(LD) $(LDFLAGS) -o $@ $^
+
 clean:
 	rm -f *.OBJ *.LST *.o *.gch *.out *.hex *.map *.elf *.a
 
@@ -69,8 +77,8 @@ test2:
 	make clean && make AES256=1 SBOX2=1 && ./test.elf
 
 time:
-	make clean && make TIME=1 && ./test.elf 
-	make clean && make TIME=1 SBOX2=1 && ./test.elf
+	make clean && make time.elf && ./time.elf 
+	make clean && make time.elf SBOX2=1 && ./time.elf
 
 lint:
 	$(call SPLINT)
