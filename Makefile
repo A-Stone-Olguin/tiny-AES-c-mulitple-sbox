@@ -57,11 +57,11 @@ lib : aes.a
 
 time.o : time.c aes.h aes.o 
 	echo [CC] $@ $(CFLAGS)
-	$(CC) $(CFLAGS) -o  $@ $<
+	$(CC) $(CFLAGS) -o  $@ $< -lm
 
 time.elf : aes.o time.o 
 	echo [LD] $@
-	$(LD) $(LDFLAGS) -o $@ $^
+	$(LD) $(LDFLAGS) -o $@ $^ -lm
 
 clean:
 	rm -f *.OBJ *.LST *.o *.gch *.out *.hex *.map *.elf *.a

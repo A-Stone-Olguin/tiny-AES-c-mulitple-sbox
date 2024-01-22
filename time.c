@@ -7,6 +7,7 @@
 #include <time.h>
 #include <sys/stat.h>
 #include <limits.h>
+#include <math.h>
 
 // Enable ECB, CTR and CBC mode. Note this can be done before including aes.h or at compile-time.
 // E.g. with GCC by using the -D flag: gcc -c aes.c -DCBC=0 -DCTR=1 -DECB=1
@@ -17,11 +18,15 @@
 #ifndef PATH_MAX
 #define PATH_MAX 4096
 #endif
+#ifndef DIR_SIZE
+#define DIR_SIZE 4096
+#endif
 
 #include "aes.h"
 
 static void time_enc_dec(int mode, const char* mode_name);
 static void enc_dec_file(char* filename, int mode);
+void mean_std_arr(double arr[], int size);
 
 int main(void) {
 
@@ -177,6 +182,35 @@ static void enc_dec_file(char* filename, int mode) {
     return;
 }
 
+// Given an array of doubles with its size, compute the average and standard deviation
+void mean_std_arr(double arr[], int size) {
+    double sum = 0;
+    double total_time = 0;
+    double average = 0;
+    double stdev = 0;
+    // Compute the average
+    for (int i = 0; i < size; i++) {
+        total_time += arr[i];
+    }
+    average = size == 0 ? 0 : total_time / (double) size;
+
+    // Reset the sum for the standard deviation
+    sum = 0;
+    for (int i = 0; i < size; i++) {
+        sum += pow(arr[i] - average, 2);
+    }
+    // Calculate variance
+    double variance = size == 0 ? 0 : sum / (double) size;
+
+    // Calculate variance
+    stdev = sqrt(variance);
+
+    // Print the results
+    printf("\tThe total time elapsed was: %f seconds\n", total_time);
+    printf("\tThe average time was: %f seconds\n", average);
+    printf("\tThe standard deviation was: %f seconds\n", stdev);
+    printf("\tThe sample size was %d files\n", size);
+}
 
 static void time_enc_dec(int mode, const char* mode_name) {
     struct dirent * dp;
@@ -190,25 +224,28 @@ static void time_enc_dec(int mode, const char* mode_name) {
         return;
     }
 
-    start = clock();
+    // This will store all the timings for each run, a maximum of 4096
+    double timings[DIR_SIZE];
+
     while ((dp = readdir(dfd)) != NULL) {
-        char full_path[PATH_MAX];      // FIle names will have at most 30 length
+        char full_path[PATH_MAX];      
         snprintf(full_path, sizeof(full_path), "%s%s", dir, dp->d_name);
         struct stat st;
 
         // Ensure we only encrypt regular files (Does a bit of slowdown)
         if (stat(full_path, &st) == 0 && S_ISREG(st.st_mode)) {
+            start = clock();
             enc_dec_file(full_path, mode);
+            end = clock();
+            timings[num_files] = ((double) (end-start)/ CLOCKS_PER_SEC);
             num_files++;
         }
     }
-    end = clock();
 
     closedir(dfd);
-    double time_elapsed = ((double) (end - start)/ CLOCKS_PER_SEC);
-    double average_time = time_elapsed / (double) num_files;
 
-    printf("For mode %s with %d S-box(es):\n\t", mode_name, SBOX2 + 1);
-    printf("The time elapsed was %f seconds (%f ms) with an average time of %f seconds (%f ms)\n", time_elapsed, time_elapsed * 100, average_time, average_time * 100);
+    printf("For mode %s with %d S-box(es):\n", mode_name, SBOX2 + 1);
+    // printf("The time elapsed was %f seconds (%f ms) with an average time of %f seconds (%f ms)\n", time_elapsed, time_elapsed * 100, average_time, average_time * 100);
+    mean_std_arr(timings, num_files);
     return;
 }
