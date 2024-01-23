@@ -14,7 +14,7 @@ ifdef AES256
 CFLAGS += -DAES256=1
 endif
 ifdef SBOX2
-CFLAGS += -DSBOX2=1
+CFLAGS += -DSBOX2=$(SBOX2)
 endif
 ifdef TIME 
 CFLAGS += -DTIME=1
@@ -79,6 +79,11 @@ test2:
 time:
 	make clean && make time.elf && ./time.elf 
 	make clean && make time.elf SBOX2=1 && ./time.elf
+
+sbox2_2:
+	make clean && make time.elf && ./time.elf 
+	make clean && make time.elf SBOX2=1 && ./time.elf
+	make clean && make time.elf SBOX2=2 && ./time.elf
 
 lint:
 	$(call SPLINT)

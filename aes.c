@@ -95,7 +95,7 @@ static const uint8_t sbox[256] = {
   0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94, 0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf,
   0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16 };
 
-#if defined(SBOX2) && (SBOX2 == 1)
+#if defined(SBOX2) && (SBOX2 >= 1)
 static const uint8_t sbox_complement[256] = {
   // 0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F
   0x1c, 0x03, 0x08, 0x04, 0x8d, 0x14, 0x10, 0xba, 0x4f, 0x7e, 0x18, 0x54, 0x81, 0xa8, 0xd4, 0x09,  // 0
@@ -136,7 +136,7 @@ static const uint8_t rsbox[256] = {
   0xa0, 0xe0, 0x3b, 0x4d, 0xae, 0x2a, 0xf5, 0xb0, 0xc8, 0xeb, 0xbb, 0x3c, 0x83, 0x53, 0x99, 0x61,
   0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d };
 
-#if defined(SBOX2) && (SBOX2 == 1)
+#if defined(SBOX2) && (SBOX2 >= 1)
 static const uint8_t sbox_complement_inv[256] = {
   // 0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F
   0x6b, 0x8a, 0x13, 0x01, 0x03, 0xbd, 0xaf, 0xc1, 0x02, 0x0f, 0x3f, 0xca, 0x8f, 0x1e, 0x2c, 0xd0,  // 0
@@ -185,7 +185,7 @@ static uint8_t getSBoxValue(uint8_t num)
 }
 */
 #define getSBoxValue(num) (sbox[(num)])
-#if defined(SBOX2) && (SBOX2 == 1)
+#if defined(SBOX2) && (SBOX2 >= 1)
 #define getSBoxXORValue(num) (sbox_complement[(num)])
 #endif
 
@@ -303,6 +303,9 @@ static void SubBytes(state_t* state)
     for (j = 0; j < 4; ++j)
     {
       (*state)[j][i] = getSBoxValue((*state)[j][i]);
+      #if defined(SBOX2) && (SBOX2 == 2)
+      (*state)[j][i] = getSBoxXORValue((*state)[j][i]);
+      #endif
     }
   }
 }
@@ -338,7 +341,7 @@ static void ShiftRows(state_t* state)
   (*state)[1][3] = temp;
 }
 
-#if (SBOX2 == 0)
+#if (SBOX2 != 1)
 static uint8_t xtime(uint8_t x)
 {
   return ((x<<1) ^ (((x>>7) & 1) * 0x1b));
@@ -408,8 +411,11 @@ static uint8_t getSBoxInvert(uint8_t num)
 */
 #define getSBoxInvert(num) (rsbox[(num)])
 
-#if defined(SBOX2) && (SBOX2 == 1)
+#if defined(SBOX2) && (SBOX2 >= 1)
 #define getSBoxXORInvert(num) (sbox_complement_inv[(num)])
+#endif
+
+#if defined(SBOX2) && (SBOX2 == 1)
 // state matrix with values in an S-box.
 static void InvSubBytesXOR(state_t* state)
 {
@@ -456,6 +462,9 @@ static void InvSubBytes(state_t* state)
     for (j = 0; j < 4; ++j)
     {
       (*state)[j][i] = getSBoxInvert((*state)[j][i]);
+      #if defined(SBOX2) && (SBOX2 == 2)
+      (*state)[j][i] = getSBoxXORInvert((*state)[j][i]);
+      #endif
     }
   }
 }
