@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "*.Rmd": "rmd",
+        "limits.h": "c",
+        "math.h": "c",
+        "math-vector.h": "c"
+    }
+}

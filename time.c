@@ -21,12 +21,16 @@
 #ifndef DIR_SIZE
 #define DIR_SIZE 4096
 #endif
+#ifndef DEBUG 
+#define DEBUG 0
+#endif
 
 #include "aes.h"
 
-static void time_enc_dec(int mode, const char* mode_name);
-static void enc_dec_file(char* filename, int mode);
+static void time_enc_dec(int mode, const char* mode_name, int debug);
+static void enc_dec_file(char* filename, int mode, int debug);
 void mean_std_arr(double arr[], int size);
+static void phex(uint8_t* str);
 
 int main(void) {
 
@@ -37,17 +41,18 @@ int main(void) {
     printf("\n\n");
     const char* mode_names[] = {"ECB", "CBC", "CTR"};
     for (int i = 0; i < 3; i++) {
-        time_enc_dec(i, mode_names[i]);
+        time_enc_dec(i, mode_names[i], DEBUG);
     }
     printf("\n\n");
     return 0;
 }
 
-static void enc_dec_file(char* filename, int mode) {
+static void enc_dec_file(char* filename, int mode, int debug) {
     uint8_t *text = NULL;
     long num_rows = 0;
     long bufsize = 0;
     int padding = 0;
+    size_t last_byte = 0;
 
     FILE *fp = fopen(filename, "r");
     if (fp == NULL) {
@@ -89,7 +94,7 @@ static void enc_dec_file(char* filename, int mode) {
         }
         fclose(fp);
 
-
+        last_byte = newLen -1;
         // Adding padding
         padding = 16 - (newLen % 16);
         if (padding != 0) {
@@ -105,6 +110,12 @@ static void enc_dec_file(char* filename, int mode) {
         }
         newLen += padding;
         text[newLen] = '\0';
+    }
+
+    if (debug) {
+        printf("The plaintext is:\n");
+        phex(text);
+        printf("\n");
     }
 
     uint8_t key[16] = { (uint8_t) 0x2b, (uint8_t) 0x7e, (uint8_t) 0x15, (uint8_t) 0x16, (uint8_t) 0x28, (uint8_t) 0xae, (uint8_t) 0xd2, (uint8_t) 0xa6, (uint8_t) 0xab, (uint8_t) 0xf7, (uint8_t) 0x15, (uint8_t) 0x88, (uint8_t) 0x09, (uint8_t) 0xcf, (uint8_t) 0x4f, (uint8_t) 0x3c };
@@ -140,6 +151,12 @@ static void enc_dec_file(char* filename, int mode) {
     else {
         printf("Invalid mode given: %d", mode);
         return;
+    }
+    
+    if (debug) {
+        printf("The ciphertext is:\n");
+        phex(text);
+        printf("\n");
     }
 
     // Now we decrypt
@@ -177,6 +194,25 @@ static void enc_dec_file(char* filename, int mode) {
         return;
     }
 
+    // Remove the padding
+    if (text[last_byte] <= 16) {
+        size_t padding_start = last_byte - text[last_byte] + 1;
+
+        for (size_t i = padding_start; i < last_byte; ++i) {
+            if (text[i] != text[last_byte]) {
+                printf("Invalid padding!\n");
+                return;
+            }
+        }
+        text[padding_start] = '\0';
+    }
+
+    if (debug) {
+        printf("The decoded ciphertext is:\n");
+        phex(text);
+        printf("\n");
+    }
+
     // Free the text buffer from memory
     free(text);
     return;
@@ -212,7 +248,7 @@ void mean_std_arr(double arr[], int size) {
     printf("\tThe sample size was %d files\n", size);
 }
 
-static void time_enc_dec(int mode, const char* mode_name) {
+static void time_enc_dec(int mode, const char* mode_name, int debug) {
     struct dirent * dp;
     DIR *dfd;
     char *dir = "dummy_files/";
@@ -235,7 +271,7 @@ static void time_enc_dec(int mode, const char* mode_name) {
         // Ensure we only encrypt regular files (Does a bit of slowdown)
         if (stat(full_path, &st) == 0 && S_ISREG(st.st_mode)) {
             start = clock();
-            enc_dec_file(full_path, mode);
+            enc_dec_file(full_path, mode, debug);
             end = clock();
             timings[num_files] = ((double) (end-start)/ CLOCKS_PER_SEC);
             num_files++;
@@ -244,8 +280,26 @@ static void time_enc_dec(int mode, const char* mode_name) {
 
     closedir(dfd);
 
-    printf("For mode %s with %d S-box(es):\n", mode_name, SBOX2 + 1);
+    printf("For mode %s with SBOX2=%d\n", mode_name, SBOX2);
     // printf("The time elapsed was %f seconds (%f ms) with an average time of %f seconds (%f ms)\n", time_elapsed, time_elapsed * 100, average_time, average_time * 100);
     mean_std_arr(timings, num_files);
     return;
+}
+
+// prints string as hex
+static void phex(uint8_t* str)
+{
+
+#if defined(AES256)
+    uint8_t len = 32;
+#elif defined(AES192)
+    uint8_t len = 24;
+#elif defined(AES128)
+    uint8_t len = 16;
+#endif
+
+    unsigned char i;
+    for (i = 0; i < len; ++i)
+        printf("%.2x", str[i]);
+    printf("\n");
 }

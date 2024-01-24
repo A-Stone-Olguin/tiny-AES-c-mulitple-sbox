@@ -461,10 +461,10 @@ static void InvSubBytes(state_t* state)
   {
     for (j = 0; j < 4; ++j)
     {
-      (*state)[j][i] = getSBoxInvert((*state)[j][i]);
       #if defined(SBOX2) && (SBOX2 == 2)
       (*state)[j][i] = getSBoxXORInvert((*state)[j][i]);
       #endif
+      (*state)[j][i] = getSBoxInvert((*state)[j][i]);
     }
   }
 }

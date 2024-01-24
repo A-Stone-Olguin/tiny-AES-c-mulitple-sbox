@@ -19,6 +19,9 @@ endif
 ifdef TIME 
 CFLAGS += -DTIME=1
 endif
+ifdef DEBUG
+CFLAGS += -DDEBUG=1
+endif
 
 OBJCOPYFLAGS = -j .text -O ihex
 OBJCOPY      = objcopy
@@ -84,6 +87,10 @@ sbox2_2:
 	make clean && make time.elf && ./time.elf 
 	make clean && make time.elf SBOX2=1 && ./time.elf
 	make clean && make time.elf SBOX2=2 && ./time.elf
+
+debug:
+	make clean && make time.elf SBOX2=2 DEBUG=1 && ./time.elf
+
 
 lint:
 	$(call SPLINT)
